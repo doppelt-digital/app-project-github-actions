@@ -6,7 +6,7 @@ jobs:
   deploy:
     runs-on: ubuntu-24.04
     container:
-      image: registry.gitlab.com/doppelt-digital-gmbh/application-platform/packages/docker/ci-base:latest
+      image: registry.gitlab.com/doppelt-digital/app-project-pipelines/ci-gitops:latest
     env:
       CI_HOSTED_RUNNER: "true"
       CI_GIT_HOST: "github"
