@@ -39,7 +39,27 @@ _hosted_asdf_export_path() {
   hash -r 2>/dev/null || true
 }
 
+# Flutter SDKs are .tar.xz. Split CI images may already have asdf at /opt/asdf
+# so the later apt-get in install_asdf never runs — install unpack tools anyway.
+_hosted_ensure_unpack_tools() {
+  if command -v xz >/dev/null 2>&1 && command -v git >/dev/null 2>&1 && command -v rsync >/dev/null 2>&1; then
+    return 0
+  fi
+  if command -v apt-get >/dev/null 2>&1; then
+    if [ "$(id -u)" -eq 0 ]; then
+      apt-get update -qq
+      apt-get install -y -qq git curl unzip xz-utils rsync ca-certificates
+    elif command -v sudo >/dev/null 2>&1; then
+      sudo apt-get update -qq
+      sudo apt-get install -y -qq git curl unzip xz-utils rsync ca-certificates
+    fi
+  elif command -v apk >/dev/null 2>&1; then
+    apk add --no-cache git curl unzip xz rsync ca-certificates
+  fi
+}
+
 install_asdf() {
+  _hosted_ensure_unpack_tools
   if [ -x /opt/asdf/bin/asdf ]; then
     export ASDF_DIR="/opt/asdf"
     export ASDF_DATA_DIR="${HOME}/.asdf"
