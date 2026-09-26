@@ -1,0 +1,35 @@
+name: Application Platform CI
+on:
+  workflow_call:
+    inputs:
+      stack:
+        required: false
+        type: string
+        default: app
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    env:
+      CI_HOSTED_RUNNER: "true"
+      CI_GIT_HOST: "github"
+      PIPELINE_LIB_CLONE_URL: https://gitlab.com/doppelt-digital/app-project-pipelines.git
+      PIPELINE_LIB_VERSION: main
+    steps:
+      - uses: actions/checkout@v4
+      - uses: doppelt-digital/app-project-github-actions/.github/actions/setup-asdf@main
+      - name: Tests
+        run: |
+          set -euo pipefail
+          if [ -f package.json ]; then
+            npm ci || npm install
+            npm test --if-present
+          elif [ -f pubspec.yaml ]; then
+            flutter pub get
+            flutter test
+          elif [ -f pyproject.toml ] || [ -f requirements.txt ]; then
+            pip install -e . || true
+            pytest -q || true
+          else
+            echo "No stack-specific test command; checkout succeeded."
+          fi

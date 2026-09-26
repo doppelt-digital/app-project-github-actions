@@ -1,0 +1,23 @@
+name: Setup ASDF
+description: Install asdf and the versions from .tool-versions on GitHub-hosted runners.
+runs:
+  using: composite
+  steps:
+    - name: Install asdf
+      shell: bash
+      run: |
+        set -euo pipefail
+        SCRIPT="${GITHUB_ACTION_PATH}/setup-hosted-asdf.sh"
+        if [ ! -f "${SCRIPT}" ]; then
+          SCRIPT="${GITHUB_ACTION_PATH}/../../../bin/misc/setup-hosted-asdf.sh"
+        fi
+        if [ ! -f "${SCRIPT}" ]; then
+          echo "Downloading hosted asdf helper..."
+          mkdir -p "${RUNNER_TEMP}/ap-pipeline-lib"
+          curl -fsSL "https://gitlab.com/doppelt-digital/app-project-pipelines/-/raw/main/bin/misc/setup-hosted-asdf.sh" \
+            -o "${RUNNER_TEMP}/ap-pipeline-lib/setup-hosted-asdf.sh"
+          chmod +x "${RUNNER_TEMP}/ap-pipeline-lib/setup-hosted-asdf.sh"
+          SCRIPT="${RUNNER_TEMP}/ap-pipeline-lib/setup-hosted-asdf.sh"
+        fi
+        # Execute (do not source): the helper writes GITHUB_PATH / GITHUB_ENV itself.
+        bash "${SCRIPT}"

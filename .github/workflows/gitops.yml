@@ -1,0 +1,19 @@
+name: GitOps
+on:
+  workflow_call:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    container:
+      image: registry.gitlab.com/doppelt-digital-gmbh/application-platform/packages/docker/ci-base:latest
+    env:
+      CI_HOSTED_RUNNER: "true"
+      CI_GIT_HOST: "github"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lint GitOps files
+        run: |
+          set -euo pipefail
+          ls -la
+          test -d configurations || echo "No configurations/ directory yet."

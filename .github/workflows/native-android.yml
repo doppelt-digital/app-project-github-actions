@@ -1,0 +1,24 @@
+name: Native Android
+on:
+  workflow_call:
+
+jobs:
+  android:
+    runs-on: ubuntu-24.04
+    container:
+      image: registry.gitlab.com/doppelt-digital-gmbh/application-platform/packages/docker/ci-android:latest
+    env:
+      CI_HOSTED_RUNNER: "true"
+      CI_GIT_HOST: "github"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: doppelt-digital/app-project-github-actions/.github/actions/setup-asdf@main
+      - name: Assemble
+        run: |
+          set -euo pipefail
+          if [ -f gradlew ]; then
+            chmod +x gradlew
+            ./gradlew assembleDebug
+          else
+            echo "No Gradle wrapper at repository root yet."
+          fi

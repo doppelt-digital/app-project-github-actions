@@ -1,0 +1,10 @@
+name: Backend
+on:
+  workflow_call:
+
+jobs:
+  ci:
+    uses: doppelt-digital/app-project-github-actions/.github/workflows/app.yml@main
+    with:
+      stack: backend
+    secrets: inherit
