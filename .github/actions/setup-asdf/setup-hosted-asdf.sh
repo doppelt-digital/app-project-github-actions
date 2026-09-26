@@ -84,10 +84,10 @@ install_asdf() {
   if command -v apt-get >/dev/null 2>&1; then
     if [ "$(id -u)" -eq 0 ]; then
       apt-get update -qq
-      apt-get install -y -qq git curl unzip ca-certificates build-essential libssl-dev libreadline-dev zlib1g-dev
+      apt-get install -y -qq git curl unzip xz-utils rsync ca-certificates build-essential libssl-dev libreadline-dev zlib1g-dev
     elif command -v sudo >/dev/null 2>&1; then
       sudo apt-get update -qq
-      sudo apt-get install -y -qq git curl unzip ca-certificates build-essential libssl-dev libreadline-dev zlib1g-dev
+      sudo apt-get install -y -qq git curl unzip xz-utils rsync ca-certificates build-essential libssl-dev libreadline-dev zlib1g-dev
     fi
   fi
 
@@ -185,9 +185,13 @@ fi
 
 echo "🤖 Reading tools from ${TOOL_VERSIONS}"
 _job_name="${CI_JOB_NAME:-${GITHUB_JOB:-}}"
-_install_slow_tools=0
+_install_java=0
+_install_ruby=0
 case "${_job_name}" in
-  *android*|*ios*|*macos*|*fastlane*) _install_slow_tools=1 ;;
+  *android*|*ios*|*macos*) _install_java=1 ;;
+esac
+case "${_job_name}" in
+  *ios*|*macos*|*fastlane*|*publish*|*release*) _install_ruby=1 ;;
 esac
 
 _tool_dir="$(dirname "${TOOL_VERSIONS}")"
@@ -206,13 +210,13 @@ while IFS= read -r line || [ -n "${line:-}" ]; do
     ''|\#*) continue ;;
   esac
   [ -n "${version}" ] || continue
-  if [ "${_install_slow_tools}" -eq 0 ]; then
-    case "${tool}" in
-      java|ruby)
-        echo "ℹ️ Skipping asdf ${tool} on hosted Linux job ${_job_name}"
-        continue
-        ;;
-    esac
+  if [ "${_install_java}" -eq 0 ] && [ "${tool}" = "java" ]; then
+    echo "ℹ️ Skipping asdf java on hosted Linux job ${_job_name}"
+    continue
+  fi
+  if [ "${_install_ruby}" -eq 0 ] && [ "${tool}" = "ruby" ]; then
+    echo "ℹ️ Skipping asdf ruby on hosted Linux job ${_job_name}"
+    continue
   fi
   plugin="$(plugin_for_tool "${tool}")"
   url="$(plugin_url "${plugin}")"
