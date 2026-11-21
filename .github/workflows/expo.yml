@@ -35,6 +35,8 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
       - uses: doppelt-digital/app-project-github-actions/.github/actions/expo-native@main
         with:
           platform: android

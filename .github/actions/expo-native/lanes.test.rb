@@ -1,6 +1,20 @@
 require 'minitest/autorun'
 require 'tmpdir'
 require 'fileutils'
+require 'yaml'
+
+class NativeWorkflowTest < Minitest::Test
+  def test_android_sdk_bootstrap_installs_supported_explicit_packages
+    workflow = YAML.load_file(File.expand_path('../../workflows/expo.yml', __dir__))
+    sdk_steps = workflow.fetch('jobs').fetch('android').fetch('steps').select do |step|
+      step.fetch('uses', '').start_with?('android-actions/setup-android@')
+    end
+    assert_equal 1, sdk_steps.length
+    packages = sdk_steps.first.fetch('with').fetch('packages').split
+    assert_includes packages, 'platform-tools'
+    refute_includes packages, 'tools', 'The removed legacy SDK tools package aborts setup before Gradle can build.'
+  end
+end
 
 module UI
   def self.user_error!(message)
