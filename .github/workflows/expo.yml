@@ -1,6 +1,15 @@
 name: Expo
 on:
   workflow_call:
+    inputs:
+      publish_beta:
+        description: Upload signed builds to internal test channels after a manual dispatch.
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: read
 
 jobs:
   ci:
@@ -8,3 +17,133 @@ jobs:
     with:
       stack: expo
     secrets: inherit
+
+  android:
+    needs: ci
+    if: >-
+      github.ref == 'refs/heads/main' && github.event_name != 'pull_request' &&
+      vars.MAINPATH_EXPO_ANDROID_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: doppelt-digital/app-project-github-actions/.github/actions/setup-asdf@main
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: doppelt-digital/app-project-github-actions/.github/actions/expo-native@main
+        with:
+          platform: android
+        env:
+          ANDROID_APP_IDENTIFIER: ${{ vars.MAINPATH_ANDROID_APP_IDENTIFIER }}
+          ANDROID_KEYSTORE_ALIAS: ${{ vars.MAINPATH_ANDROID_KEYSTORE_ALIAS }}
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.MAINPATH_ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.MAINPATH_ANDROID_KEYSTORE_PASSWORD }}
+          APP_VERSION: ${{ vars.MAINPATH_APP_VERSION }}
+          BUILD_NUMBER_OFFSET: ${{ vars.MAINPATH_BUILD_NUMBER_OFFSET }}
+          EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: expo-android-${{ github.sha }}
+          path: |
+            android/app/build/outputs/bundle/release/*.aab
+            android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 14
+
+  ios:
+    needs: ci
+    if: >-
+      github.ref == 'refs/heads/main' && github.event_name != 'pull_request' &&
+      vars.MAINPATH_EXPO_IOS_ENABLED == 'true'
+    runs-on: macos-15
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: doppelt-digital/app-project-github-actions/.github/actions/setup-asdf@main
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+      - uses: doppelt-digital/app-project-github-actions/.github/actions/expo-native@main
+        with:
+          platform: ios
+        env:
+          IOS_APP_IDENTIFIER: ${{ vars.MAINPATH_IOS_APP_IDENTIFIER }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.MAINPATH_APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_KEY_ISSUER_ID: ${{ secrets.MAINPATH_APP_STORE_CONNECT_KEY_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY: ${{ secrets.MAINPATH_APP_STORE_CONNECT_KEY }}
+          APP_STORE_CONNECT_DEVELOPER_TEAM_ID: ${{ secrets.MAINPATH_APP_STORE_CONNECT_DEVELOPER_TEAM_ID }}
+          MATCH_GIT_URL: ${{ secrets.MAINPATH_MATCH_GIT_URL }}
+          MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MAINPATH_MATCH_GIT_BASIC_AUTHORIZATION }}
+          MATCH_PASSWORD: ${{ secrets.MAINPATH_MATCH_PASSWORD }}
+          APP_VERSION: ${{ vars.MAINPATH_APP_VERSION }}
+          BUILD_NUMBER_OFFSET: ${{ vars.MAINPATH_BUILD_NUMBER_OFFSET }}
+          EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: expo-ios-${{ github.sha }}
+          path: ios/builds/*.ipa
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 14
+
+  beta-android:
+    needs: android
+    if: >-
+      inputs.publish_beta && github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: mainpath-beta
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+      - uses: actions/download-artifact@v4
+        with:
+          name: expo-android-${{ github.sha }}
+          path: native-artifacts
+      - uses: doppelt-digital/app-project-github-actions/.github/actions/expo-native@main
+        with:
+          platform: publish-android
+        env:
+          ANDROID_APP_IDENTIFIER: ${{ vars.MAINPATH_ANDROID_APP_IDENTIFIER }}
+          PLAY_STORE_CREDENTIALS_BASE64: ${{ secrets.MAINPATH_PLAY_STORE_CREDENTIALS_BASE64 }}
+
+  beta-ios:
+    needs: ios
+    if: >-
+      inputs.publish_beta && github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/main'
+    runs-on: macos-15
+    timeout-minutes: 60
+    environment: mainpath-beta
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+      - uses: actions/download-artifact@v4
+        with:
+          name: expo-ios-${{ github.sha }}
+          path: native-artifacts
+      - uses: doppelt-digital/app-project-github-actions/.github/actions/expo-native@main
+        with:
+          platform: publish-ios
+        env:
+          IOS_APP_IDENTIFIER: ${{ vars.MAINPATH_IOS_APP_IDENTIFIER }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.MAINPATH_APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_KEY_ISSUER_ID: ${{ secrets.MAINPATH_APP_STORE_CONNECT_KEY_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY: ${{ secrets.MAINPATH_APP_STORE_CONNECT_KEY }}

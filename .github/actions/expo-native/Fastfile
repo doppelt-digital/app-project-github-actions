@@ -1,0 +1,90 @@
+require 'securerandom'
+require 'base64'
+require 'json'
+
+def native_api_key
+  value = ENV.fetch('APP_STORE_CONNECT_KEY')
+  value = Base64.decode64(value) unless value.include?('BEGIN PRIVATE KEY')
+  app_store_connect_api_key(
+    key_id: ENV.fetch('APP_STORE_CONNECT_KEY_ID'),
+    issuer_id: ENV.fetch('APP_STORE_CONNECT_KEY_ISSUER_ID'),
+    key_content: value,
+    duration: 1200,
+    in_house: false
+  )
+end
+
+def one_native_artifact(extension)
+  paths = Dir.glob(File.join(ENV.fetch('MAINPATH_PROJECT_ROOT'), 'native-artifacts', '**', "*.#{extension}"))
+  UI.user_error!("Expected exactly one #{extension} artifact from this workflow run") unless paths.length == 1
+  paths.first
+end
+
+lane :build_ios_release do
+  root = ENV.fetch('MAINPATH_PROJECT_ROOT')
+  keychain = "mainpath-#{ENV.fetch('GITHUB_RUN_ID')}-#{ENV.fetch('GITHUB_RUN_ATTEMPT', '1')}"
+  password = SecureRandom.hex(32)
+  created = false
+  begin
+    create_keychain(name: keychain, password: password, default_keychain: false,
+                    unlock: true, timeout: 7200, lock_when_sleeps: false,
+                    add_to_search_list: true)
+    created = true
+    api_key = native_api_key
+    # Builds consume existing signing material. App/certificate creation and
+    # store metadata changes do not happen as a side effect of a source push.
+    begin
+      match(type: 'appstore', readonly: true, api_key: api_key,
+            app_identifier: ENV.fetch('IOS_APP_IDENTIFIER'),
+            team_id: ENV.fetch('APP_STORE_CONNECT_DEVELOPER_TEAM_ID'),
+            git_url: ENV.fetch('MATCH_GIT_URL'),
+            git_branch: ENV.fetch('APP_STORE_CONNECT_DEVELOPER_TEAM_ID'),
+            git_basic_authorization: ENV.fetch('MATCH_GIT_BASIC_AUTHORIZATION'),
+            keychain_name: keychain, keychain_password: password)
+    rescue
+      UI.user_error!('Readonly signing failed. Prepare the selected Apple team certificate and App Store profile in the organization Match repository before rebuilding.')
+    end
+    workspaces = Dir.glob(File.join(root, 'ios', '*.xcworkspace'))
+    UI.user_error!('Expected exactly one Expo Xcode workspace') unless workspaces.length == 1
+    workspace = workspaces.first
+    scheme = File.basename(workspace, '.xcworkspace')
+    identifier = ENV.fetch('IOS_APP_IDENTIFIER')
+    profile = ENV["sigh_#{identifier}_appstore_profile-name"]
+    UI.user_error!('Readonly Match did not return the selected app provisioning profile') if profile.to_s.empty?
+    projects = Dir.glob(File.join(root, 'ios', '*.xcodeproj'))
+    UI.user_error!('Expected exactly one Expo Xcode project') unless projects.length == 1
+    update_code_signing_settings(path: projects.first, targets: [scheme],
+                                 build_configurations: ['Release'],
+                                 use_automatic_signing: false,
+                                 team_id: ENV.fetch('APP_STORE_CONNECT_DEVELOPER_TEAM_ID'),
+                                 code_sign_identity: 'Apple Distribution',
+                                 profile_name: profile)
+    build_app(workspace: workspace, scheme: scheme,
+              configuration: 'Release', clean: true,
+              export_method: 'app-store',
+              export_team_id: ENV.fetch('APP_STORE_CONNECT_DEVELOPER_TEAM_ID'),
+              export_options: { signingStyle: 'manual', provisioningProfiles: { identifier => profile } },
+              output_directory: File.join(root, 'ios/builds'), output_name: 'App.ipa')
+  ensure
+    delete_keychain(name: keychain) if created
+  end
+end
+
+lane :internal_testflight do
+  upload_to_testflight(ipa: one_native_artifact('ipa'), api_key: native_api_key,
+                      app_identifier: ENV.fetch('IOS_APP_IDENTIFIER'),
+                      skip_waiting_for_build_processing: false,
+                      skip_submission: true, distribute_external: false,
+                      notify_external_testers: false, expire_previous_builds: false)
+end
+
+lane :internal_play do
+  credentials = Base64.decode64(ENV.fetch('PLAY_STORE_CREDENTIALS_BASE64'))
+  # Validate the JSON before giving it to Fastlane; never write it into artifacts.
+  JSON.parse(credentials)
+  upload_to_play_store(package_name: ENV.fetch('ANDROID_APP_IDENTIFIER'),
+                       json_key_data: credentials, aab: one_native_artifact('aab'),
+                       track: 'internal', release_status: 'completed',
+                       skip_upload_metadata: true, skip_upload_images: true,
+                       skip_upload_screenshots: true, skip_upload_changelogs: true)
+end

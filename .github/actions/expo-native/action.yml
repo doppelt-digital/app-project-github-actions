@@ -1,0 +1,13 @@
+name: Build or distribute Expo native artifacts
+description: Sign native release artifacts, or explicitly distribute them to internal beta channels.
+inputs:
+  platform:
+    description: android, ios, publish-android or publish-ios
+    required: true
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        MAINPATH_NATIVE_OPERATION: ${{ inputs.platform }}
+      run: bash "$GITHUB_ACTION_PATH/run.sh"

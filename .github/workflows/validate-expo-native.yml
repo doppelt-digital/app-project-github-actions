@@ -1,0 +1,39 @@
+name: Validate Expo native workflows
+on:
+  push:
+    paths:
+      - '.github/actions/expo-native/**'
+      - '.github/workflows/expo.yml'
+      - '.github/workflows/validate-expo-native.yml'
+  pull_request:
+    paths:
+      - '.github/actions/expo-native/**'
+      - '.github/workflows/expo.yml'
+      - '.github/workflows/validate-expo-native.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+      - name: Native helper and lane regressions
+        run: |
+          node --test .github/actions/expo-native/native.test.cjs
+          ruby .github/actions/expo-native/lanes.test.rb
+          bash -n .github/actions/expo-native/run.sh
+          ruby -c .github/actions/expo-native/Fastfile
+      - name: Validate workflow syntax
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 .github/workflows/expo.yml .github/workflows/validate-expo-native.yml
