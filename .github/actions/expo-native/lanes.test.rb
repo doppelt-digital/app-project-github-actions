@@ -4,6 +4,24 @@ require 'fileutils'
 require 'yaml'
 
 class NativeWorkflowTest < Minitest::Test
+  def test_reusable_workflow_declares_only_optional_owned_secrets_used_by_its_jobs
+    workflow = YAML.load_file(File.expand_path('../../workflows/expo.yml', __dir__))
+    trigger = workflow['on'] || workflow[true] # Psych versions using YAML 1.1 parse on as true.
+    declared = trigger.fetch('workflow_call').fetch('secrets')
+    expected = %w[
+      MAINPATH_ANDROID_KEYSTORE_BASE64 MAINPATH_ANDROID_KEYSTORE_PASSWORD MAINPATH_PLAY_STORE_CREDENTIALS_BASE64
+      MAINPATH_APP_STORE_CONNECT_KEY_ID MAINPATH_APP_STORE_CONNECT_KEY_ISSUER_ID MAINPATH_APP_STORE_CONNECT_KEY
+      MAINPATH_APP_STORE_CONNECT_DEVELOPER_TEAM_ID MAINPATH_MATCH_GIT_URL MAINPATH_MATCH_GIT_BASIC_AUTHORIZATION
+      MAINPATH_MATCH_PASSWORD
+    ]
+    assert_equal expected.sort, declared.keys.sort
+    assert_equal declared.keys.sort, referenced_secrets(workflow.fetch('jobs')).uniq.sort
+    declared.each_value do |definition|
+      assert_equal false, definition.fetch('required')
+      assert_empty definition.keys - %w[required description], 'Secret declarations must not contain values or defaults.'
+    end
+  end
+
   def test_android_sdk_bootstrap_installs_supported_explicit_packages
     workflow = YAML.load_file(File.expand_path('../../workflows/expo.yml', __dir__))
     sdk_steps = workflow.fetch('jobs').fetch('android').fetch('steps').select do |step|
@@ -13,6 +31,17 @@ class NativeWorkflowTest < Minitest::Test
     packages = sdk_steps.first.fetch('with').fetch('packages').split
     assert_includes packages, 'platform-tools'
     refute_includes packages, 'tools', 'The removed legacy SDK tools package aborts setup before Gradle can build.'
+  end
+
+  private
+
+  def referenced_secrets(value)
+    case value
+    when Hash then value.values.flat_map { |entry| referenced_secrets(entry) }
+    when Array then value.flat_map { |entry| referenced_secrets(entry) }
+    when String then value.scan(/\bsecrets\.([A-Z][A-Z0-9_]*)/).flatten
+    else []
+    end
   end
 end
 

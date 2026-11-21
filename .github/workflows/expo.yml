@@ -7,6 +7,27 @@ on:
         type: boolean
         required: false
         default: false
+    secrets:
+      MAINPATH_ANDROID_KEYSTORE_BASE64:
+        required: false
+      MAINPATH_ANDROID_KEYSTORE_PASSWORD:
+        required: false
+      MAINPATH_PLAY_STORE_CREDENTIALS_BASE64:
+        required: false
+      MAINPATH_APP_STORE_CONNECT_KEY_ID:
+        required: false
+      MAINPATH_APP_STORE_CONNECT_KEY_ISSUER_ID:
+        required: false
+      MAINPATH_APP_STORE_CONNECT_KEY:
+        required: false
+      MAINPATH_APP_STORE_CONNECT_DEVELOPER_TEAM_ID:
+        required: false
+      MAINPATH_MATCH_GIT_URL:
+        required: false
+      MAINPATH_MATCH_GIT_BASIC_AUTHORIZATION:
+        required: false
+      MAINPATH_MATCH_PASSWORD:
+        required: false
 
 permissions:
   contents: read
