@@ -35,6 +35,55 @@ ensure_imagemagick() {
   fi
 }
 
+layout_flutter_goldens() {
+  # golden_toolkit writes "<locale>.<screen>.<device>.png" next to Framefile.json.
+  # The script that normally renames them imports package:path and only resolves
+  # when it sits inside the app package. On GitHub it is cloned outside the app,
+  # so the layout happens here. Missing status-bar overlays are skipped, same as
+  # the GitLab Frameit step. iPhone and iPad sizes are normalized to the frames
+  # Frameit ships; Android sizes are normalized to the fork's Galaxy S21+ and
+  # Pixel Slate frames.
+  local src base lang rest screen device dest lower status
+  shopt -s nullglob
+  mkdir -p test/goldens/fastlane/screenshots
+  for src in test/goldens/*.png; do
+    base="$(basename "${src}" .png)"
+    case "${base}" in
+      *framed*) continue ;;
+    esac
+    lang="${base%%.*}"
+    rest="${base#*.}"
+    screen="${rest%%.*}"
+    device="${rest#*.}"
+    if [ -z "${screen}" ] || [ "${screen}" = "${rest}" ] || [ -z "${device}" ]; then
+      echo "Skipping unexpected golden name: ${base}"
+      continue
+    fi
+    dest="test/goldens/fastlane/screenshots/${lang}/${device}-${screen}.png"
+    mkdir -p "$(dirname "${dest}")"
+    lower="$(printf '%s' "${device}" | tr '[:upper:]' '[:lower:]')"
+    status="test/static_files/status_bar_${device}.png"
+    if [ ! -f "${status}" ]; then
+      status="$(find test/static_files -maxdepth 1 -iname "status_bar_${device}.png" 2>/dev/null | head -n 1 || true)"
+    fi
+    if [ -n "${status}" ] && [ -f "${status}" ]; then
+      magick composite -gravity North "${status}" "${src}" "${dest}"
+    else
+      cp "${src}" "${dest}"
+    fi
+    if printf '%s' "${lower}" | grep -Eq 'ipad'; then
+      magick "${dest}" -resize '2048x2732^' -gravity center -extent 2048x2732 "${dest}"
+    elif printf '%s' "${lower}" | grep -Eq 'iphone'; then
+      magick "${dest}" -resize '1290x2796^' -gravity center -extent 1290x2796 "${dest}"
+    elif printf '%s' "${lower}" | grep -Eq 'pixel_slate|nexus_10'; then
+      magick "${dest}" -resize '2304x3313^' -gravity center -extent 2304x3313 "${dest}"
+    elif printf '%s' "${lower}" | grep -Eq 'samsung|pixel_|nexus_'; then
+      magick "${dest}" -resize '1180x2500^' -gravity center -extent 1180x2500 "${dest}"
+    fi
+    echo "Prepared $(basename "${dest}") for ${lang}"
+  done
+}
+
 ensure_bundle() {
   ensure_pipeline_lib
   export GEM_HOME="${ROOT}/.gem"
@@ -82,7 +131,7 @@ capture() {
       fi
     done
     flutter test --update-goldens "${dart_defines[@]}"
-    dart "${PIPELINE_LIB_DIR}/frontend-template/static/test/scripts/test_post_actions.dart"
+    layout_flutter_goldens
     return 0
   fi
   if [ -f ios/fastlane/Snapfile ]; then
