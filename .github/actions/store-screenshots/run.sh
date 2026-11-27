@@ -39,9 +39,9 @@ ensure_bundle() {
   ensure_pipeline_lib
   export GEM_HOME="${ROOT}/.gem"
   export PATH="${GEM_HOME}/bin:${PATH}"
-  if ! command -v bundle >/dev/null 2>&1; then
-    gem install bundler --no-document
-  fi
+  # Fastlane rejects Bundler 3 and 4. GitHub macOS images ship Bundler 4.
+  gem install bundler:2.7.2 --no-document
+  hash -r || true
   export BUNDLE_GEMFILE="${PIPELINE_LIB_DIR}/frontend-template/static/test-goldens/Gemfile"
   export BUNDLE_PATH="${ROOT}/.bundle-frameit"
   export BUNDLE_USER_HOME="${BUNDLE_PATH}"
