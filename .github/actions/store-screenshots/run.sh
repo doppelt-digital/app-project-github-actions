@@ -119,6 +119,13 @@ cd test/goldens
 shopt -s nullglob
 mkdir -p fastlane/screenshots
 cp Framefile.json fastlane/screenshots/Framefile.json
+for asset in ./*.png; do
+  cp "${asset}" fastlane/screenshots/
+done
+if [ -d fonts ]; then
+  rm -rf fastlane/screenshots/fonts
+  cp -R fonts fastlane/screenshots/fonts
+fi
 
 frame_locale() {
   local locale="$1"
