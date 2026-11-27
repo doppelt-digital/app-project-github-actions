@@ -23,3 +23,30 @@ jobs:
           else
             echo "No Gradle wrapper at repository root yet."
           fi
+  screenshot-detect:
+    runs-on: ubuntu-24.04
+    outputs:
+      capture: ${{ steps.check.outputs.capture }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: check
+        shell: bash
+        run: |
+          if [ -f .doppelt-digital-create-new-screenshots ]; then
+            echo "capture=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "capture=false" >> "$GITHUB_OUTPUT"
+          fi
+  screenshots:
+    needs: screenshot-detect
+    if: needs.screenshot-detect.outputs.capture == 'true'
+    runs-on: ubuntu-24.04
+    env:
+      CI_HOSTED_RUNNER: "true"
+      CI_GIT_HOST: "github"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: doppelt-digital/app-project-github-actions/.github/actions/setup-asdf@main
+      - uses: doppelt-digital/app-project-github-actions/.github/actions/store-screenshots@main
+        with:
+          force: "true"
