@@ -37,6 +37,8 @@ ensure_imagemagick() {
 
 ensure_bundle() {
   ensure_pipeline_lib
+  export GEM_HOME="${ROOT}/.gem"
+  export PATH="${GEM_HOME}/bin:${PATH}"
   if ! command -v bundle >/dev/null 2>&1; then
     gem install bundler --no-document
   fi
