@@ -40,15 +40,16 @@ ensure_bundle() {
   export GEM_HOME="${ROOT}/.gem"
   export PATH="${GEM_HOME}/bin:${PATH}"
   # Fastlane rejects Bundler 3 and 4. GitHub macOS images ship Bundler 4.
-  gem install bundler:2.7.2 --no-document
+  mkdir -p "${GEM_HOME}/bin"
+  gem install bundler:2.7.2 --no-document --bindir "${GEM_HOME}/bin"
   hash -r || true
   export BUNDLE_GEMFILE="${PIPELINE_LIB_DIR}/frontend-template/static/test-goldens/Gemfile"
   export BUNDLE_PATH="${ROOT}/.bundle-frameit"
   export BUNDLE_USER_HOME="${BUNDLE_PATH}"
   export BUNDLE_USER_CACHE="${BUNDLE_PATH}/cache"
   mkdir -p "${BUNDLE_USER_CACHE}"
-  bundle config set --local path "${BUNDLE_PATH}"
-  bundle install
+  bundle _2.7.2_ config set --local path "${BUNDLE_PATH}"
+  bundle _2.7.2_ install
 }
 
 capture() {
@@ -88,7 +89,7 @@ capture() {
     ensure_bundle
     (
       cd ios
-      bundle exec fastlane snapshot
+      bundle _2.7.2_ exec fastlane snapshot
     )
     python3 "${PIPELINE_LIB_DIR}/frontend-template/general/bin/normalize-native-ios-screenshots.py" \
       --project-dir "${ROOT}"
@@ -162,17 +163,17 @@ frame_locale() {
         sed -i.bak 's/"use_platform": "[^"]*"/"use_platform": "ANDROID"/' fastlane/screenshots/Framefile.json
         sed -i.bak 's/"device_frame_version": "[^"]*"/"device_frame_version": "100"/' fastlane/screenshots/Framefile.json
         rm -f fastlane/screenshots/Framefile.json.bak
-        bundle exec ruby "${PIPELINE_LIB_DIR}/frontend-template/general/bin/seed-android-frameit-frames.rb"
+        bundle _2.7.2_ exec ruby "${PIPELINE_LIB_DIR}/frontend-template/general/bin/seed-android-frameit-frames.rb"
         (
           cd fastlane/screenshots
-          bundle exec fastlane frameit android --resume
+          bundle _2.7.2_ exec fastlane frameit android --resume
         )
       else
         sed -i.bak 's/"use_platform": "[^"]*"/"use_platform": "IOS"/' fastlane/screenshots/Framefile.json
         rm -f fastlane/screenshots/Framefile.json.bak
         (
           cd fastlane/screenshots
-          bundle exec fastlane frameit ios --resume
+          bundle _2.7.2_ exec fastlane frameit ios --resume
         )
       fi
     fi
