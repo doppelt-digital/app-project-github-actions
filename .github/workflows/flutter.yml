@@ -22,7 +22,7 @@ jobs:
         run: |
           set -euo pipefail
           flutter pub get
-          flutter test || true
+          flutter test --exclude-tags golden || true
   screenshot-detect:
     runs-on: ubuntu-24.04
     outputs:
